@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   greetingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   greeting: {
     fontSize: 18,
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontFamily: 'Inter-Bold',
     color: '#FFFFFF',
-    marginBottom: 12,
+    marginBottom: 4,
   },
   dateContainer: {
     flexDirection: 'row',

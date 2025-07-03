@@ -6,11 +6,11 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkles, Plus, Clock, Lightbulb, TrendingUp } from 'lucide-react-native';
+import { Sparkles, Plus, Clock, Lightbulb, TrendingUp, Zap } from 'lucide-react-native';
 import { AIsuggestion, Task } from '@/types/task';
 import { generateAISuggestions } from '@/lib/aiSuggestions';
 import { TaskStorage } from '@/lib/storage';
@@ -20,20 +20,21 @@ export default function AISuggestionsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  useEffect(() => {
+    loadSuggestions();
+  }, []);
+
   const loadSuggestions = async () => {
     try {
       const newSuggestions = await generateAISuggestions();
       setSuggestions(newSuggestions);
     } catch (error) {
       console.error('Error loading AI suggestions:', error);
+      Alert.alert('Error', 'Failed to load AI suggestions. Please try again.');
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    loadSuggestions();
-  }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -74,8 +75,12 @@ export default function AISuggestionsScreen() {
   if (loading) {
     return (
       <LinearGradient colors={['#6366F1', '#8B5CF6']} style={styles.loadingContainer}>
-        <Sparkles size={32} color="#FFFFFF" />
-        <Text style={styles.loadingText}>Generating AI suggestions...</Text>
+        <View style={styles.loadingContent}>
+          <Sparkles size={48} color="#FFFFFF" />
+          <ActivityIndicator size="large" color="#FFFFFF" style={styles.loadingSpinner} />
+          <Text style={styles.loadingText}>Generating AI suggestions...</Text>
+          <Text style={styles.loadingSubtext}>Analyzing your schedule and productivity patterns</Text>
+        </View>
       </LinearGradient>
     );
   }
@@ -87,9 +92,13 @@ export default function AISuggestionsScreen() {
           <View style={styles.titleContainer}>
             <Sparkles size={28} color="#FFFFFF" />
             <Text style={styles.title}>AI Suggestions</Text>
+            <View style={styles.aiIndicator}>
+              <Zap size={16} color="#FFFFFF" />
+              <Text style={styles.aiIndicatorText}>AI Powered</Text>
+            </View>
           </View>
           <Text style={styles.subtitle}>
-            Personalized recommendations to optimize your day
+            Personalized recommendations powered by artificial intelligence
           </Text>
         </View>
       </LinearGradient>
@@ -106,7 +115,7 @@ export default function AISuggestionsScreen() {
             <Text style={styles.insightsTitle}>Smart Insights</Text>
           </View>
           <Text style={styles.insightsText}>
-            Based on productivity research and your patterns, here are optimized suggestions for your day.
+            AI-powered suggestions based on your productivity patterns, current schedule, and proven time management principles.
           </Text>
         </View>
 
@@ -154,7 +163,7 @@ export default function AISuggestionsScreen() {
 
         <View style={styles.refreshHint}>
           <Text style={styles.refreshHintText}>
-            Pull down to refresh for new suggestions
+            Pull down to refresh for new AI suggestions
           </Text>
         </View>
 
@@ -174,11 +183,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingContent: {
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  loadingSpinner: {
+    marginVertical: 20,
+  },
   loadingText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'Inter-Medium',
-    marginTop: 12,
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  loadingSubtext: {
+    color: '#E0E7FF',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   header: {
     paddingTop: 60,
@@ -192,12 +216,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    width: '100%',
   },
   title: {
     fontSize: 28,
     fontFamily: 'Inter-Bold',
     color: '#FFFFFF',
     marginLeft: 12,
+    flex: 1,
+  },
+  aiIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  aiIndicatorText: {
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+    color: '#FFFFFF',
+    marginLeft: 4,
   },
   subtitle: {
     fontSize: 16,
