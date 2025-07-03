@@ -12,18 +12,7 @@ import {
   Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { 
-  MessageCircle, 
-  Send, 
-  Bot, 
-  User, 
-  Plus, 
-  Clock, 
-  Lightbulb,
-  Sparkles,
-  CheckCircle,
-  Calendar
-} from 'lucide-react-native';
+import { MessageCircle, Send, Bot, User, Plus, Clock, Lightbulb, Sparkles, CircleCheck as CheckCircle, Calendar } from 'lucide-react-native';
 import { Task } from '@/types/task';
 import { TaskStorage } from '@/lib/storage';
 
