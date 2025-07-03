@@ -4,22 +4,20 @@ import { TaskStorage } from './storage';
 
 export const generateAISuggestions = async (): Promise<AIsuggestion[]> => {
   try {
-    // Check if API key is configured
-    if (!process.env.EXPO_PUBLIC_OPENAI_API_KEY) {
-      console.warn('OpenAI API key not configured, using fallback suggestions');
-      return getFallbackSuggestions();
-    }
-
     // Get user context
     const userContext = await buildUserContext();
     
-    // Generate AI suggestions
-    const suggestions = await aiService.generateSuggestions(userContext);
+    // Try to get API key from environment (optional)
+    const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+    
+    // Generate AI suggestions (will use fallback if no API key)
+    const suggestions = await aiService.generateSuggestions(userContext, apiKey);
     
     return suggestions;
   } catch (error) {
     console.error('Error generating AI suggestions:', error);
-    return getFallbackSuggestions();
+    // Return basic fallback suggestions if everything fails
+    return getBasicFallbackSuggestions();
   }
 };
 
@@ -66,72 +64,46 @@ function getPreferredCategories(existingTasks: Task[], completedTasks: Task[]): 
     .map(([category]) => category);
 }
 
-function getFallbackSuggestions(): AIsuggestion[] {
+function getBasicFallbackSuggestions(): AIsuggestion[] {
   const now = new Date();
   const currentHour = now.getHours();
   
-  const suggestions: AIsuggestion[] = [
+  return [
     {
-      id: 'fallback_morning_1',
-      title: 'Morning Mindfulness',
-      description: 'Start with 5 minutes of deep breathing or meditation',
-      suggestedTime: '07:30',
-      category: 'Wellness',
-      priority: 'high',
-      reason: 'Morning mindfulness reduces stress and improves focus throughout the day'
-    },
-    {
-      id: 'fallback_morning_2',
-      title: 'Priority Planning',
-      description: 'Identify your top 3 most important tasks for today',
-      suggestedTime: '08:30',
+      id: 'basic_planning',
+      title: 'Plan Your Day',
+      description: 'Take 10 minutes to organize your priorities',
+      suggestedTime: '9:00 AM',
       category: 'Planning',
       priority: 'high',
-      reason: 'Clear priorities help maintain focus and ensure important work gets done'
+      reason: 'Planning helps you stay focused and productive'
     },
     {
-      id: 'fallback_midday_1',
-      title: 'Energy Boost Walk',
-      description: 'Take a 15-minute walk outside for fresh air',
-      suggestedTime: '13:30',
+      id: 'basic_health',
+      title: 'Take a Break',
+      description: 'Step away from work for 15 minutes',
+      suggestedTime: '2:00 PM',
       category: 'Health',
       priority: 'medium',
-      reason: 'Midday movement combats afternoon fatigue and improves creativity'
+      reason: 'Regular breaks improve focus and prevent burnout'
     },
     {
-      id: 'fallback_afternoon_1',
-      title: 'Skill Development',
-      description: 'Spend 20 minutes learning something new in your field',
-      suggestedTime: '15:00',
+      id: 'basic_learning',
+      title: 'Learn Something New',
+      description: 'Spend 20 minutes on skill development',
+      suggestedTime: '4:00 PM',
       category: 'Learning',
       priority: 'medium',
-      reason: 'Continuous learning keeps you competitive and engaged in your career'
+      reason: 'Continuous learning keeps you growing and engaged'
     },
     {
-      id: 'fallback_evening_1',
-      title: 'Tomorrow\'s Success Setup',
-      description: 'Prepare clothes, meals, or materials for tomorrow',
-      suggestedTime: '20:00',
+      id: 'basic_reflection',
+      title: 'Daily Reflection',
+      description: 'Review your accomplishments and plan tomorrow',
+      suggestedTime: '8:00 PM',
       category: 'Planning',
-      priority: 'medium',
-      reason: 'Evening preparation reduces morning stress and decision fatigue'
-    },
-    {
-      id: 'fallback_evening_2',
-      title: 'Gratitude Reflection',
-      description: 'Write down 3 things you\'re grateful for today',
-      suggestedTime: '21:30',
-      category: 'Wellness',
       priority: 'low',
-      reason: 'Gratitude practice improves mental well-being and sleep quality'
+      reason: 'Reflection helps you learn and improve over time'
     }
   ];
-
-  // Filter suggestions based on current time
-  const relevantSuggestions = suggestions.filter(suggestion => {
-    const suggestionHour = parseInt(suggestion.suggestedTime.split(':')[0]);
-    return suggestionHour >= currentHour;
-  });
-
-  return relevantSuggestions.slice(0, 4);
 }

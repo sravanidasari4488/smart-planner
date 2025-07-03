@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkles, Plus, Clock, Lightbulb, TrendingUp, Zap } from 'lucide-react-native';
+import { Sparkles, Plus, Clock, Lightbulb, TrendingUp, Zap, Info } from 'lucide-react-native';
 import { AIsuggestion, Task } from '@/types/task';
 import { generateAISuggestions } from '@/lib/aiSuggestions';
 import { TaskStorage } from '@/lib/storage';
@@ -19,6 +19,7 @@ export default function AISuggestionsScreen() {
   const [suggestions, setSuggestions] = useState<AIsuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isUsingFallback, setIsUsingFallback] = useState(false);
 
   useEffect(() => {
     loadSuggestions();
@@ -28,6 +29,10 @@ export default function AISuggestionsScreen() {
     try {
       const newSuggestions = await generateAISuggestions();
       setSuggestions(newSuggestions);
+      
+      // Check if we're using fallback suggestions (no OpenAI API key)
+      const hasApiKey = !!process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+      setIsUsingFallback(!hasApiKey);
     } catch (error) {
       console.error('Error loading AI suggestions:', error);
       Alert.alert('Error', 'Failed to load AI suggestions. Please try again.');
@@ -78,7 +83,7 @@ export default function AISuggestionsScreen() {
         <View style={styles.loadingContent}>
           <Sparkles size={48} color="#FFFFFF" />
           <ActivityIndicator size="large" color="#FFFFFF" style={styles.loadingSpinner} />
-          <Text style={styles.loadingText}>Generating AI suggestions...</Text>
+          <Text style={styles.loadingText}>Generating smart suggestions...</Text>
           <Text style={styles.loadingSubtext}>Analyzing your schedule and productivity patterns</Text>
         </View>
       </LinearGradient>
@@ -91,14 +96,19 @@ export default function AISuggestionsScreen() {
         <View style={styles.headerContent}>
           <View style={styles.titleContainer}>
             <Sparkles size={28} color="#FFFFFF" />
-            <Text style={styles.title}>AI Suggestions</Text>
+            <Text style={styles.title}>Smart Suggestions</Text>
             <View style={styles.aiIndicator}>
               <Zap size={16} color="#FFFFFF" />
-              <Text style={styles.aiIndicatorText}>AI Powered</Text>
+              <Text style={styles.aiIndicatorText}>
+                {isUsingFallback ? 'Smart' : 'AI Powered'}
+              </Text>
             </View>
           </View>
           <Text style={styles.subtitle}>
-            Personalized recommendations powered by artificial intelligence
+            {isUsingFallback 
+              ? 'Intelligent recommendations based on productivity best practices'
+              : 'Personalized recommendations powered by artificial intelligence'
+            }
           </Text>
         </View>
       </LinearGradient>
@@ -109,13 +119,29 @@ export default function AISuggestionsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
+        {isUsingFallback && (
+          <View style={styles.infoCard}>
+            <View style={styles.infoHeader}>
+              <Info size={20} color="#3B82F6" />
+              <Text style={styles.infoTitle}>Smart Suggestions Mode</Text>
+            </View>
+            <Text style={styles.infoText}>
+              You're seeing curated suggestions based on productivity research and best practices. 
+              For AI-powered personalized suggestions, configure your OpenAI API key in the app settings.
+            </Text>
+          </View>
+        )}
+
         <View style={styles.insightsCard}>
           <View style={styles.insightsHeader}>
             <TrendingUp size={20} color="#6366F1" />
-            <Text style={styles.insightsTitle}>Smart Insights</Text>
+            <Text style={styles.insightsTitle}>Productivity Insights</Text>
           </View>
           <Text style={styles.insightsText}>
-            AI-powered suggestions based on your productivity patterns, current schedule, and proven time management principles.
+            {isUsingFallback 
+              ? 'These suggestions are based on proven productivity principles and time management research.'
+              : 'AI-powered suggestions based on your productivity patterns, current schedule, and proven time management principles.'
+            }
           </Text>
         </View>
 
@@ -163,7 +189,7 @@ export default function AISuggestionsScreen() {
 
         <View style={styles.refreshHint}>
           <Text style={styles.refreshHintText}>
-            Pull down to refresh for new AI suggestions
+            Pull down to refresh for new suggestions
           </Text>
         </View>
 
@@ -250,6 +276,31 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 24,
+  },
+  infoCard: {
+    backgroundColor: '#EBF8FF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#1E40AF',
+    marginLeft: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#1E40AF',
+    lineHeight: 20,
   },
   insightsCard: {
     backgroundColor: '#FFFFFF',

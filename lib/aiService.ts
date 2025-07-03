@@ -24,7 +24,13 @@ export class AITaskSuggestionService {
     return AITaskSuggestionService.instance;
   }
 
-  async generateSuggestions(userContext: UserContext, apiKey: string): Promise<AIsuggestion[]> {
+  async generateSuggestions(userContext: UserContext, apiKey?: string): Promise<AIsuggestion[]> {
+    // If no API key is provided, return fallback suggestions
+    if (!apiKey) {
+      console.log('No OpenAI API key provided, using fallback suggestions');
+      return this.getFallbackSuggestions(userContext);
+    }
+
     const openai = new OpenAI({
       apiKey,
       dangerouslyAllowBrowser: true,
@@ -41,12 +47,12 @@ export class AITaskSuggestionService {
             content: `You are an AI productivity assistant. Generate a JSON array of 4-6 personalized task suggestions tailored to the user's current time, day of the week, completed tasks, scheduled tasks, and preferred categories. Each suggestion should have the following properties:
 
 - id: unique string identifier
-- title: short title of the task
-- description: brief explanation (1-2 lines)
-- suggestedTime: time in HH:MM (24hr format) that fits well with the user's day
+- title: short title of the task (max 50 characters)
+- description: brief explanation (max 100 characters)
+- suggestedTime: time in 12-hour format (e.g., "9:30 AM", "2:15 PM")
 - category: one from the user's preferred or new categories
 - priority: high | medium | low
-- reason: why this task is recommended
+- reason: why this task is recommended (max 120 characters)
 
 Respond only with a JSON array of suggestions.`,
           },
@@ -72,7 +78,10 @@ Respond only with a JSON array of suggestions.`,
 
   async validateApiKey(apiKey: string): Promise<boolean> {
     try {
-      const openai = new OpenAI({ apiKey });
+      const openai = new OpenAI({ 
+        apiKey,
+        dangerouslyAllowBrowser: true 
+      });
       await openai.models.list();
       return true;
     } catch (error) {
@@ -90,13 +99,16 @@ Respond only with a JSON array of suggestions.`,
         : 'No scheduled tasks';
 
     return `
-Time: ${context.currentTime}
-Day: ${context.dayOfWeek}
-Completed tasks today: ${context.completedTasksToday}
-Preferred categories: ${context.preferredCategories?.join(', ') || 'None'}
+Current Context:
+- Time: ${context.currentTime}
+- Day: ${context.dayOfWeek}
+- Completed tasks today: ${context.completedTasksToday}
+- Preferred categories: ${context.preferredCategories?.join(', ') || 'Work, Personal, Health'}
 
 Scheduled Tasks:
 ${existingTasksText}
+
+Please suggest 4-6 productive tasks that would fit well into this person's day, considering their schedule and productivity patterns.
 `;
   }
 
@@ -119,41 +131,182 @@ ${existingTasksText}
 
   private getFallbackSuggestions(context: UserContext): AIsuggestion[] {
     const currentHour = parseInt(context.currentTime.split(':')[0]);
-    const fallback: AIsuggestion[] = [];
+    const isWeekend = context.dayOfWeek === 'Saturday' || context.dayOfWeek === 'Sunday';
+    
+    const suggestions: AIsuggestion[] = [];
 
-    if (currentHour < 12) {
-      fallback.push({
-        id: 'fallback_morning',
-        title: 'Hydrate and Stretch',
-        description: 'Start the day by drinking water and stretching',
-        suggestedTime: '08:00',
-        category: 'Wellness',
-        priority: 'medium',
-        reason: 'Good habits energize your morning',
-      });
-    } else if (currentHour < 17) {
-      fallback.push({
-        id: 'fallback_midday',
-        title: 'Midday Review',
-        description: 'Take 10 minutes to review progress and adjust plan',
-        suggestedTime: '13:00',
-        category: 'Planning',
-        priority: 'medium',
-        reason: 'Helps stay on track and reduce stress',
-      });
-    } else {
-      fallback.push({
-        id: 'fallback_evening',
-        title: 'Plan Tomorrow',
-        description: 'Write down 3 things to do tomorrow',
-        suggestedTime: '20:00',
+    // Morning suggestions (6 AM - 12 PM)
+    if (currentHour >= 6 && currentHour < 12) {
+      suggestions.push(
+        {
+          id: 'morning_hydration',
+          title: 'Morning Hydration & Stretch',
+          description: 'Start with a glass of water and 5-minute stretch routine',
+          suggestedTime: '7:30 AM',
+          category: 'Health',
+          priority: 'high',
+          reason: 'Hydration and movement boost energy and focus for the day ahead'
+        },
+        {
+          id: 'priority_planning',
+          title: 'Daily Priority Review',
+          description: 'Identify your top 3 most important tasks for today',
+          suggestedTime: '8:30 AM',
+          category: 'Planning',
+          priority: 'high',
+          reason: 'Clear priorities help maintain focus and ensure important work gets done'
+        }
+      );
+
+      if (!isWeekend) {
+        suggestions.push({
+          id: 'deep_work_block',
+          title: 'Deep Work Session',
+          description: 'Focus on your most challenging task without distractions',
+          suggestedTime: '9:00 AM',
+          category: 'Work',
+          priority: 'high',
+          reason: 'Morning hours are ideal for complex tasks when mental energy is highest'
+        });
+      }
+    }
+
+    // Afternoon suggestions (12 PM - 6 PM)
+    if (currentHour >= 12 && currentHour < 18) {
+      suggestions.push(
+        {
+          id: 'energy_walk',
+          title: 'Energizing Walk',
+          description: 'Take a 15-minute walk outside for fresh air and movement',
+          suggestedTime: '1:30 PM',
+          category: 'Health',
+          priority: 'medium',
+          reason: 'Midday movement combats afternoon fatigue and improves creativity'
+        },
+        {
+          id: 'skill_development',
+          title: 'Skill Building Time',
+          description: 'Spend 20 minutes learning something new in your field',
+          suggestedTime: '3:00 PM',
+          category: 'Learning',
+          priority: 'medium',
+          reason: 'Continuous learning keeps you competitive and engaged'
+        }
+      );
+
+      if (isWeekend) {
+        suggestions.push({
+          id: 'personal_project',
+          title: 'Personal Project Time',
+          description: 'Work on a hobby or personal interest project',
+          suggestedTime: '2:00 PM',
+          category: 'Personal',
+          priority: 'medium',
+          reason: 'Weekends are perfect for pursuing personal interests and creativity'
+        });
+      }
+    }
+
+    // Evening suggestions (6 PM - 10 PM)
+    if (currentHour >= 18 && currentHour < 22) {
+      suggestions.push(
+        {
+          id: 'tomorrow_prep',
+          title: 'Tomorrow\'s Success Setup',
+          description: 'Prepare clothes, meals, or materials for tomorrow',
+          suggestedTime: '8:00 PM',
+          category: 'Planning',
+          priority: 'medium',
+          reason: 'Evening preparation reduces morning stress and decision fatigue'
+        },
+        {
+          id: 'gratitude_reflection',
+          title: 'Gratitude & Reflection',
+          description: 'Write down 3 things you\'re grateful for today',
+          suggestedTime: '9:30 PM',
+          category: 'Wellness',
+          priority: 'low',
+          reason: 'Gratitude practice improves mental well-being and sleep quality'
+        }
+      );
+
+      if (context.completedTasksToday < 3) {
+        suggestions.push({
+          id: 'quick_win',
+          title: 'Quick Win Task',
+          description: 'Complete one small task to end the day productively',
+          suggestedTime: '7:00 PM',
+          category: 'Personal',
+          priority: 'medium',
+          reason: 'Small accomplishments create momentum and positive feelings'
+        });
+      }
+    }
+
+    // Late evening/night suggestions (10 PM+)
+    if (currentHour >= 22 || currentHour < 6) {
+      suggestions.push(
+        {
+          id: 'wind_down',
+          title: 'Digital Wind Down',
+          description: 'Put devices away and prepare for restful sleep',
+          suggestedTime: '10:00 PM',
+          category: 'Wellness',
+          priority: 'high',
+          reason: 'Reducing screen time before bed improves sleep quality'
+        },
+        {
+          id: 'reading_time',
+          title: 'Relaxing Reading',
+          description: 'Read a book or magazine for 15-20 minutes',
+          suggestedTime: '10:30 PM',
+          category: 'Personal',
+          priority: 'low',
+          reason: 'Reading helps relax the mind and transition to sleep'
+        }
+      );
+    }
+
+    // Add context-specific suggestions based on existing tasks
+    if (context.existingTasks.length === 0) {
+      suggestions.push({
+        id: 'first_task',
+        title: 'Plan Your Day',
+        description: 'Add your first task to get started with planning',
+        suggestedTime: this.getNextAvailableTime(currentHour),
         category: 'Planning',
         priority: 'high',
-        reason: 'Prepping the night before eases morning anxiety',
+        reason: 'Starting with a plan helps organize your day effectively'
       });
     }
 
-    return fallback;
+    // Filter suggestions based on current time and return top 4-6
+    const relevantSuggestions = suggestions.filter(suggestion => {
+      const suggestionHour = this.parseTimeToHour(suggestion.suggestedTime);
+      return suggestionHour >= currentHour;
+    });
+
+    return relevantSuggestions.slice(0, 6);
+  }
+
+  private parseTimeToHour(timeString: string): number {
+    const [time, period] = timeString.split(' ');
+    let [hours] = time.split(':').map(Number);
+    
+    if (period === 'PM' && hours !== 12) {
+      hours += 12;
+    } else if (period === 'AM' && hours === 12) {
+      hours = 0;
+    }
+    
+    return hours;
+  }
+
+  private getNextAvailableTime(currentHour: number): string {
+    const nextHour = currentHour + 1;
+    const hour12 = nextHour > 12 ? nextHour - 12 : nextHour;
+    const period = nextHour >= 12 ? 'PM' : 'AM';
+    return `${hour12}:00 ${period}`;
   }
 }
 
