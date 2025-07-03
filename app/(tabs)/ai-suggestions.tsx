@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkles, Plus, Clock, Lightbulb, TrendingUp, Zap, Info, AlertTriangle } from 'lucide-react-native';
+import { Sparkles, Plus, Clock, Lightbulb, TrendingUp, Zap, Info, TriangleAlert as AlertTriangle } from 'lucide-react-native';
 import { AIsuggestion, Task } from '@/types/task';
 import { generateAISuggestions } from '@/lib/aiSuggestions';
 import { TaskStorage } from '@/lib/storage';
