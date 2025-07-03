@@ -24,11 +24,24 @@ export class AITaskSuggestionService {
     return AITaskSuggestionService.instance;
   }
 
-  async generateSuggestions(userContext: UserContext, apiKey?: string): Promise<AIsuggestion[]> {
+  async generateSuggestions(userContext: UserContext, apiKey?: string): Promise<{ suggestions: AIsuggestion[], usingFallback: boolean, error?: string }> {
     // If no API key is provided, return fallback suggestions
     if (!apiKey) {
       console.log('No OpenAI API key provided, using fallback suggestions');
-      return this.getFallbackSuggestions(userContext);
+      return {
+        suggestions: this.getFallbackSuggestions(userContext),
+        usingFallback: true
+      };
+    }
+
+    // Validate API key format
+    if (!this.isValidApiKeyFormat(apiKey)) {
+      console.warn('Invalid OpenAI API key format, using fallback suggestions');
+      return {
+        suggestions: this.getFallbackSuggestions(userContext),
+        usingFallback: true,
+        error: 'Invalid API key format'
+      };
     }
 
     const openai = new OpenAI({
@@ -69,14 +82,40 @@ Respond only with a JSON array of suggestions.`,
       if (!response) throw new Error('No response from AI');
 
       const suggestions = JSON.parse(response);
-      return this.validateAndFormatSuggestions(suggestions);
-    } catch (error) {
+      return {
+        suggestions: this.validateAndFormatSuggestions(suggestions),
+        usingFallback: false
+      };
+    } catch (error: any) {
       console.error('AI Suggestion error:', error);
-      return this.getFallbackSuggestions(userContext);
+      
+      let errorMessage = 'AI service temporarily unavailable';
+      if (error.status === 401) {
+        errorMessage = 'Invalid API key - please check your OpenAI API key';
+      } else if (error.status === 429) {
+        errorMessage = 'API rate limit exceeded - please try again later';
+      } else if (error.status === 403) {
+        errorMessage = 'API access forbidden - please check your OpenAI account';
+      }
+
+      return {
+        suggestions: this.getFallbackSuggestions(userContext),
+        usingFallback: true,
+        error: errorMessage
+      };
     }
   }
 
+  private isValidApiKeyFormat(apiKey: string): boolean {
+    // OpenAI API keys should start with 'sk-' and be at least 20 characters
+    return apiKey.startsWith('sk-') && apiKey.length >= 20;
+  }
+
   async validateApiKey(apiKey: string): Promise<boolean> {
+    if (!this.isValidApiKeyFormat(apiKey)) {
+      return false;
+    }
+
     try {
       const openai = new OpenAI({ 
         apiKey,
@@ -168,6 +207,16 @@ Please suggest 4-6 productive tasks that would fit well into this person's day, 
           priority: 'high',
           reason: 'Morning hours are ideal for complex tasks when mental energy is highest'
         });
+      } else {
+        suggestions.push({
+          id: 'weekend_planning',
+          title: 'Weekend Planning',
+          description: 'Plan relaxing and enjoyable activities for the weekend',
+          suggestedTime: '9:00 AM',
+          category: 'Personal',
+          priority: 'medium',
+          reason: 'Planning helps you make the most of your free time'
+        });
       }
     }
 
@@ -203,6 +252,16 @@ Please suggest 4-6 productive tasks that would fit well into this person's day, 
           category: 'Personal',
           priority: 'medium',
           reason: 'Weekends are perfect for pursuing personal interests and creativity'
+        });
+      } else {
+        suggestions.push({
+          id: 'afternoon_review',
+          title: 'Progress Check-in',
+          description: 'Review morning accomplishments and adjust afternoon plans',
+          suggestedTime: '2:30 PM',
+          category: 'Planning',
+          priority: 'low',
+          reason: 'Regular check-ins help you stay on track and adjust as needed'
         });
       }
     }
@@ -241,6 +300,18 @@ Please suggest 4-6 productive tasks that would fit well into this person's day, 
           reason: 'Small accomplishments create momentum and positive feelings'
         });
       }
+
+      if (isWeekend) {
+        suggestions.push({
+          id: 'social_connection',
+          title: 'Connect with Loved Ones',
+          description: 'Call or message someone important to you',
+          suggestedTime: '7:30 PM',
+          category: 'Social',
+          priority: 'medium',
+          reason: 'Social connections are vital for mental health and happiness'
+        });
+      }
     }
 
     // Late evening/night suggestions (10 PM+)
@@ -277,6 +348,19 @@ Please suggest 4-6 productive tasks that would fit well into this person's day, 
         category: 'Planning',
         priority: 'high',
         reason: 'Starting with a plan helps organize your day effectively'
+      });
+    }
+
+    // Add productivity boost suggestions based on completed tasks
+    if (context.completedTasksToday >= 5) {
+      suggestions.push({
+        id: 'celebration',
+        title: 'Celebrate Your Progress',
+        description: 'Take a moment to acknowledge your productivity today',
+        suggestedTime: this.getNextAvailableTime(currentHour),
+        category: 'Wellness',
+        priority: 'low',
+        reason: 'Celebrating achievements boosts motivation and well-being'
       });
     }
 

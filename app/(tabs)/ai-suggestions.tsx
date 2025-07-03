@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkles, Plus, Clock, Lightbulb, TrendingUp, Zap, Info } from 'lucide-react-native';
+import { Sparkles, Plus, Clock, Lightbulb, TrendingUp, Zap, Info, AlertTriangle } from 'lucide-react-native';
 import { AIsuggestion, Task } from '@/types/task';
 import { generateAISuggestions } from '@/lib/aiSuggestions';
 import { TaskStorage } from '@/lib/storage';
@@ -20,6 +20,7 @@ export default function AISuggestionsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isUsingFallback, setIsUsingFallback] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadSuggestions();
@@ -27,15 +28,13 @@ export default function AISuggestionsScreen() {
 
   const loadSuggestions = async () => {
     try {
-      const newSuggestions = await generateAISuggestions();
-      setSuggestions(newSuggestions);
-      
-      // Check if we're using fallback suggestions (no OpenAI API key)
-      const hasApiKey = !!process.env.EXPO_PUBLIC_OPENAI_API_KEY;
-      setIsUsingFallback(!hasApiKey);
+      const result = await generateAISuggestions();
+      setSuggestions(result.suggestions);
+      setIsUsingFallback(result.usingFallback);
+      setErrorMessage(result.error || null);
     } catch (error) {
       console.error('Error loading AI suggestions:', error);
-      Alert.alert('Error', 'Failed to load AI suggestions. Please try again.');
+      Alert.alert('Error', 'Failed to load suggestions. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -119,7 +118,19 @@ export default function AISuggestionsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {isUsingFallback && (
+        {errorMessage && (
+          <View style={styles.errorCard}>
+            <View style={styles.errorHeader}>
+              <AlertTriangle size={20} color="#EF4444" />
+              <Text style={styles.errorTitle}>API Issue Detected</Text>
+            </View>
+            <Text style={styles.errorText}>
+              {errorMessage}. Don't worry - you're still getting great suggestions based on productivity research!
+            </Text>
+          </View>
+        )}
+
+        {isUsingFallback && !errorMessage && (
           <View style={styles.infoCard}>
             <View style={styles.infoHeader}>
               <Info size={20} color="#3B82F6" />
@@ -276,6 +287,31 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 24,
+  },
+  errorCard: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  errorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  errorTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#DC2626',
+    marginLeft: 8,
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#DC2626',
+    lineHeight: 20,
   },
   infoCard: {
     backgroundColor: '#EBF8FF',

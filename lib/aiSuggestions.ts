@@ -2,7 +2,7 @@ import { AIsuggestion, Task } from '@/types/task';
 import { aiService } from './aiService';
 import { TaskStorage } from './storage';
 
-export const generateAISuggestions = async (): Promise<AIsuggestion[]> => {
+export const generateAISuggestions = async (): Promise<{ suggestions: AIsuggestion[], usingFallback: boolean, error?: string }> => {
   try {
     // Get user context
     const userContext = await buildUserContext();
@@ -10,14 +10,18 @@ export const generateAISuggestions = async (): Promise<AIsuggestion[]> => {
     // Try to get API key from environment (optional)
     const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
     
-    // Generate AI suggestions (will use fallback if no API key)
-    const suggestions = await aiService.generateSuggestions(userContext, apiKey);
+    // Generate AI suggestions (will use fallback if no API key or if API key is invalid)
+    const result = await aiService.generateSuggestions(userContext, apiKey);
     
-    return suggestions;
+    return result;
   } catch (error) {
     console.error('Error generating AI suggestions:', error);
     // Return basic fallback suggestions if everything fails
-    return getBasicFallbackSuggestions();
+    return {
+      suggestions: getBasicFallbackSuggestions(),
+      usingFallback: true,
+      error: 'Service temporarily unavailable'
+    };
   }
 };
 
