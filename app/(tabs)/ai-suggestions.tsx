@@ -29,12 +29,25 @@ export default function AISuggestionsScreen() {
   const loadSuggestions = async () => {
     try {
       const result = await generateAISuggestions();
-      setSuggestions(result.suggestions);
-      setIsUsingFallback(result.usingFallback);
-      setErrorMessage(result.error || null);
+      
+      // Ensure we always have an array of suggestions
+      if (result && Array.isArray(result.suggestions)) {
+        setSuggestions(result.suggestions);
+        setIsUsingFallback(result.usingFallback || false);
+        setErrorMessage(result.error || null);
+      } else {
+        // Fallback to empty array if result is malformed
+        console.warn('Invalid suggestions result, using empty array');
+        setSuggestions([]);
+        setIsUsingFallback(true);
+        setErrorMessage('Failed to load suggestions');
+      }
     } catch (error) {
       console.error('Error loading AI suggestions:', error);
-      Alert.alert('Error', 'Failed to load suggestions. Please try again.');
+      // Set empty array and show error state
+      setSuggestions([]);
+      setIsUsingFallback(true);
+      setErrorMessage('Failed to load suggestions. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -156,47 +169,60 @@ export default function AISuggestionsScreen() {
           </Text>
         </View>
 
-        {suggestions.map((suggestion) => (
-          <View key={suggestion.id} style={styles.suggestionCard}>
-            <View style={styles.suggestionHeader}>
-              <View style={styles.suggestionTitleRow}>
-                <Text style={styles.suggestionTitle}>{suggestion.title}</Text>
-                <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(suggestion.priority) + '20' }]}>
-                  <Text style={[styles.priorityText, { color: getPriorityColor(suggestion.priority) }]}>
-                    {suggestion.priority.toUpperCase()}
-                  </Text>
-                </View>
-              </View>
-              
-              <Text style={styles.suggestionDescription}>{suggestion.description}</Text>
-            </View>
-
-            <View style={styles.suggestionMeta}>
-              <View style={styles.timeContainer}>
-                <Clock size={16} color="#6B7280" />
-                <Text style={styles.timeText}>{suggestion.suggestedTime}</Text>
-              </View>
-              
-              <View style={styles.categoryContainer}>
-                <Text style={styles.categoryText}>{suggestion.category}</Text>
-              </View>
-            </View>
-
-            <View style={styles.reasonContainer}>
-              <Lightbulb size={16} color="#F59E0B" />
-              <Text style={styles.reasonText}>{suggestion.reason}</Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => handleAddSuggestion(suggestion)}
-              activeOpacity={0.8}
-            >
-              <Plus size={18} color="#FFFFFF" />
-              <Text style={styles.addButtonText}>Add to Planner</Text>
+        {suggestions.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Lightbulb size={48} color="#9CA3AF" />
+            <Text style={styles.emptyTitle}>No Suggestions Available</Text>
+            <Text style={styles.emptyDescription}>
+              Pull down to refresh and try loading suggestions again.
+            </Text>
+            <TouchableOpacity style={styles.retryButton} onPress={onRefresh}>
+              <Text style={styles.retryButtonText}>Try Again</Text>
             </TouchableOpacity>
           </View>
-        ))}
+        ) : (
+          suggestions.map((suggestion) => (
+            <View key={suggestion.id} style={styles.suggestionCard}>
+              <View style={styles.suggestionHeader}>
+                <View style={styles.suggestionTitleRow}>
+                  <Text style={styles.suggestionTitle}>{suggestion.title}</Text>
+                  <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(suggestion.priority) + '20' }]}>
+                    <Text style={[styles.priorityText, { color: getPriorityColor(suggestion.priority) }]}>
+                      {suggestion.priority.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+                
+                <Text style={styles.suggestionDescription}>{suggestion.description}</Text>
+              </View>
+
+              <View style={styles.suggestionMeta}>
+                <View style={styles.timeContainer}>
+                  <Clock size={16} color="#6B7280" />
+                  <Text style={styles.timeText}>{suggestion.suggestedTime}</Text>
+                </View>
+                
+                <View style={styles.categoryContainer}>
+                  <Text style={styles.categoryText}>{suggestion.category}</Text>
+                </View>
+              </View>
+
+              <View style={styles.reasonContainer}>
+                <Lightbulb size={16} color="#F59E0B" />
+                <Text style={styles.reasonText}>{suggestion.reason}</Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => handleAddSuggestion(suggestion)}
+                activeOpacity={0.8}
+              >
+                <Plus size={18} color="#FFFFFF" />
+                <Text style={styles.addButtonText}>Add to Planner</Text>
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
 
         <View style={styles.refreshHint}>
           <Text style={styles.refreshHintText}>
@@ -370,6 +396,38 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#6B7280',
     lineHeight: 20,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontFamily: 'Inter-SemiBold',
+    color: '#374151',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyDescription: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: '#FFFFFF',
   },
   suggestionCard: {
     backgroundColor: '#FFFFFF',
