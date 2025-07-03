@@ -12,9 +12,10 @@ import {
   Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MessageCircle, Send, Bot, User, Plus, Clock, Lightbulb, Sparkles, CircleCheck as CheckCircle, Calendar } from 'lucide-react-native';
+import { MessageCircle, Send, Bot, User, Plus, Clock, Lightbulb, Sparkles, CircleCheck as CheckCircle, Calendar, List } from 'lucide-react-native';
 import { Task } from '@/types/task';
 import { TaskStorage } from '@/lib/storage';
+import { chatbotService } from '@/lib/chatbotService';
 
 interface ChatMessage {
   id: string;
@@ -28,41 +29,17 @@ interface ChatMessage {
     category: string;
     priority: 'low' | 'medium' | 'high';
   };
+  suggestions?: string[];
 }
 
 const CHAT_PROMPTS = [
   "What's on your mind today?",
-  "Tell me about your goals for this week",
-  "What would you like to accomplish?",
-  "Any ideas you'd like to explore?",
-  "What's been challenging you lately?",
+  "Tell me about your goals",
+  "Show me some hobbies",
+  "Help me be more productive",
+  "I want to learn something new",
+  "Plan my week",
 ];
-
-const BOT_RESPONSES = {
-  greeting: [
-    "Hi there! I'm here to help you organize your thoughts and turn them into actionable tasks. What's on your mind?",
-    "Hello! Ready to plan something amazing? Tell me what you're thinking about.",
-    "Hey! I'm your planning assistant. Share what's in your head and let's make it happen!",
-  ],
-  encouragement: [
-    "That sounds like a great idea! Let me help you break it down into actionable steps.",
-    "I love that thinking! How can we turn this into something concrete?",
-    "Interesting! Let's explore this further and create a plan.",
-    "That's a wonderful goal! What would be the first step?",
-  ],
-  clarification: [
-    "Tell me more about that. What specific outcome are you hoping for?",
-    "That's intriguing! Can you give me more details about what you have in mind?",
-    "I'd love to help you with that. What does success look like to you?",
-    "Great start! What would be the ideal timeline for this?",
-  ],
-  taskSuggestion: [
-    "Based on what you've shared, I think this could be a perfect task for your planner:",
-    "Here's how I'd structure this as an actionable task:",
-    "Let me suggest a way to organize this:",
-    "I've crafted this task based on your thoughts:",
-  ]
-};
 
 export default function PlanningChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -75,9 +52,16 @@ export default function PlanningChatScreen() {
     // Initialize with greeting
     const greeting: ChatMessage = {
       id: 'greeting',
-      text: getRandomResponse(BOT_RESPONSES.greeting),
+      text: "Hi there! I'm your planning assistant. I can help you organize your thoughts, suggest activities, create tasks, and answer questions. What would you like to explore today?",
       isBot: true,
       timestamp: new Date(),
+      suggestions: [
+        "Show me some hobbies to try",
+        "Help me plan my day",
+        "I want to be more productive",
+        "Suggest some books to read",
+        "Give me exercise ideas"
+      ]
     };
     setMessages([greeting]);
 
@@ -89,104 +73,20 @@ export default function PlanningChatScreen() {
     }).start();
   }, []);
 
-  const getRandomResponse = (responses: string[]) => {
-    return responses[Math.floor(Math.random() * responses.length)];
-  };
-
   const generateBotResponse = (userMessage: string): ChatMessage => {
-    const lowerMessage = userMessage.toLowerCase();
+    // Analyze the user's message
+    const analysis = chatbotService.analyzeMessage(userMessage);
     
-    // Keywords that suggest task creation
-    const taskKeywords = ['want to', 'need to', 'should', 'plan to', 'goal', 'accomplish', 'finish', 'complete', 'work on', 'learn', 'practice', 'exercise', 'call', 'meeting', 'deadline'];
-    const timeKeywords = ['today', 'tomorrow', 'this week', 'next week', 'morning', 'afternoon', 'evening', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    
-    const hasTaskKeywords = taskKeywords.some(keyword => lowerMessage.includes(keyword));
-    const hasTimeKeywords = timeKeywords.some(keyword => lowerMessage.includes(keyword));
-    
-    if (hasTaskKeywords || hasTimeKeywords) {
-      // Generate a task suggestion
-      const suggestedTask = generateTaskFromMessage(userMessage);
-      
-      return {
-        id: Date.now().toString(),
-        text: getRandomResponse(BOT_RESPONSES.taskSuggestion),
-        isBot: true,
-        timestamp: new Date(),
-        suggestedTask,
-      };
-    } else if (lowerMessage.length < 10) {
-      // Short message, ask for clarification
-      return {
-        id: Date.now().toString(),
-        text: getRandomResponse(BOT_RESPONSES.clarification),
-        isBot: true,
-        timestamp: new Date(),
-      };
-    } else {
-      // Encouraging response
-      return {
-        id: Date.now().toString(),
-        text: getRandomResponse(BOT_RESPONSES.encouragement),
-        isBot: true,
-        timestamp: new Date(),
-      };
-    }
-  };
-
-  const generateTaskFromMessage = (message: string) => {
-    const lowerMessage = message.toLowerCase();
-    
-    // Extract potential title (first meaningful phrase)
-    let title = message.split('.')[0].split(',')[0];
-    if (title.length > 50) {
-      title = title.substring(0, 47) + '...';
-    }
-    
-    // Determine category based on keywords
-    let category = 'Personal';
-    if (lowerMessage.includes('work') || lowerMessage.includes('job') || lowerMessage.includes('meeting') || lowerMessage.includes('project')) {
-      category = 'Work';
-    } else if (lowerMessage.includes('exercise') || lowerMessage.includes('gym') || lowerMessage.includes('health') || lowerMessage.includes('doctor')) {
-      category = 'Health';
-    } else if (lowerMessage.includes('learn') || lowerMessage.includes('study') || lowerMessage.includes('course') || lowerMessage.includes('read')) {
-      category = 'Learning';
-    } else if (lowerMessage.includes('friend') || lowerMessage.includes('family') || lowerMessage.includes('call') || lowerMessage.includes('visit')) {
-      category = 'Social';
-    }
-    
-    // Determine priority based on urgency words
-    let priority: 'low' | 'medium' | 'high' = 'medium';
-    if (lowerMessage.includes('urgent') || lowerMessage.includes('asap') || lowerMessage.includes('deadline') || lowerMessage.includes('important')) {
-      priority = 'high';
-    } else if (lowerMessage.includes('someday') || lowerMessage.includes('eventually') || lowerMessage.includes('when i have time')) {
-      priority = 'low';
-    }
-    
-    // Suggest time based on context
-    let time = '10:00 AM';
-    const now = new Date();
-    const currentHour = now.getHours();
-    
-    if (lowerMessage.includes('morning')) {
-      time = '9:00 AM';
-    } else if (lowerMessage.includes('afternoon')) {
-      time = '2:00 PM';
-    } else if (lowerMessage.includes('evening')) {
-      time = '7:00 PM';
-    } else if (currentHour < 12) {
-      time = '10:00 AM';
-    } else if (currentHour < 17) {
-      time = '3:00 PM';
-    } else {
-      time = '8:00 PM';
-    }
+    // Generate appropriate response
+    const response = chatbotService.generateResponse(userMessage, analysis);
     
     return {
-      title: title.charAt(0).toUpperCase() + title.slice(1),
-      description: message.length > 100 ? message.substring(0, 97) + '...' : message,
-      time,
-      category,
-      priority,
+      id: Date.now().toString(),
+      text: response.text,
+      isBot: true,
+      timestamp: new Date(),
+      suggestedTask: response.suggestedTask,
+      suggestions: response.suggestions,
     };
   };
 
@@ -204,12 +104,18 @@ export default function PlanningChatScreen() {
     setInputText('');
     setIsTyping(true);
 
-    // Simulate typing delay
+    // Simulate realistic typing delay based on response complexity
+    const typingDelay = Math.min(2000, Math.max(800, userMessage.text.length * 20));
+    
     setTimeout(() => {
       const botResponse = generateBotResponse(userMessage.text);
       setMessages(prev => [...prev, botResponse]);
       setIsTyping(false);
-    }, 1000 + Math.random() * 1000);
+    }, typingDelay);
+  };
+
+  const handleSuggestionPress = (suggestion: string) => {
+    setInputText(suggestion);
   };
 
   const addTaskToPlanner = async (suggestedTask: any) => {
@@ -263,7 +169,7 @@ export default function PlanningChatScreen() {
             </View>
           </View>
           <Text style={styles.subtitle}>
-            Share your thoughts and I'll help you turn them into actionable tasks
+            Your intelligent companion for organizing thoughts and creating actionable plans
           </Text>
         </View>
       </LinearGradient>
@@ -287,7 +193,10 @@ export default function PlanningChatScreen() {
                 message.isBot ? styles.botMessageContainer : styles.userMessageContainer
               ]}>
                 <View style={styles.messageHeader}>
-                  <View style={styles.avatarContainer}>
+                  <View style={[
+                    styles.avatarContainer,
+                    message.isBot ? styles.botAvatar : styles.userAvatar
+                  ]}>
                     {message.isBot ? (
                       <Bot size={20} color="#6366F1" />
                     ) : (
@@ -311,6 +220,27 @@ export default function PlanningChatScreen() {
                   </Text>
                 </View>
 
+                {/* Suggestions List */}
+                {message.suggestions && message.suggestions.length > 0 && (
+                  <View style={styles.suggestionsContainer}>
+                    <View style={styles.suggestionsHeader}>
+                      <List size={16} color="#6366F1" />
+                      <Text style={styles.suggestionsTitle}>Suggestions:</Text>
+                    </View>
+                    {message.suggestions.map((suggestion, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.suggestionItem}
+                        onPress={() => handleSuggestionPress(suggestion)}
+                      >
+                        <Text style={styles.suggestionText}>{suggestion}</Text>
+                        <Sparkles size={14} color="#6366F1" />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Task Suggestion */}
                 {message.suggestedTask && (
                   <View style={styles.taskSuggestion}>
                     <View style={styles.taskHeader}>
@@ -362,7 +292,7 @@ export default function PlanningChatScreen() {
             {isTyping && (
               <View style={[styles.messageContainer, styles.botMessageContainer]}>
                 <View style={styles.messageHeader}>
-                  <View style={styles.avatarContainer}>
+                  <View style={[styles.avatarContainer, styles.botAvatar]}>
                     <Bot size={20} color="#6366F1" />
                   </View>
                 </View>
@@ -386,7 +316,7 @@ export default function PlanningChatScreen() {
               style={styles.textInput}
               value={inputText}
               onChangeText={setInputText}
-              placeholder="Share what's on your mind..."
+              placeholder="Ask me anything or share your thoughts..."
               placeholderTextColor="#9CA3AF"
               multiline
               maxLength={500}
@@ -507,7 +437,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
@@ -519,6 +448,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  botAvatar: {
+    backgroundColor: '#FFFFFF',
+  },
+  userAvatar: {
+    backgroundColor: '#6366F1',
   },
   messageTime: {
     fontSize: 12,
@@ -572,6 +507,44 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#9CA3AF',
     marginHorizontal: 2,
+  },
+  suggestionsContainer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    maxWidth: '90%',
+  },
+  suggestionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  suggestionsTitle: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: '#6366F1',
+    marginLeft: 6,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  suggestionText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#374151',
+    flex: 1,
   },
   taskSuggestion: {
     backgroundColor: '#F8FAFC',
