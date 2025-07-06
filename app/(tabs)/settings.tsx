@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bell, Shield, Palette, CircleHelp as HelpCircle, ChevronRight } from 'lucide-react-native';
+import { Bell, Shield, Palette, Circle as HelpCircle, ChevronRight } from 'lucide-react-native';
 import NotificationSettings from '@/components/NotificationSettings';
 
 export default function SettingsScreen() {
