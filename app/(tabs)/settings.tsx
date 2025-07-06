@@ -2,24 +2,24 @@ import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import { useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Bell, Shield, Palette, CircleHelp as HelpCircle, ChevronRight } from 'lucide-react-native';
+import NotificationSettings from '@/components/NotificationSettings';
 
 export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
 
   const settingsItems = [
     {
       icon: Bell,
       title: 'Notifications',
-      subtitle: 'Manage your notification preferences',
+      subtitle: 'Manage task reminders and alerts',
       rightComponent: (
-        <Switch
-          value={notificationsEnabled}
-          onValueChange={setNotificationsEnabled}
-          trackColor={{ false: '#D1D5DB', true: '#3B82F6' }}
-          thumbColor={notificationsEnabled ? '#FFFFFF' : '#F3F4F6'}
-        />
+        <TouchableOpacity onPress={() => setShowNotificationSettings(true)}>
+          <ChevronRight size={20} color="#9CA3AF" />
+        </TouchableOpacity>
       ),
+      onPress: () => setShowNotificationSettings(true),
     },
     {
       icon: Palette,
@@ -49,42 +49,54 @@ export default function SettingsScreen() {
   ];
 
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Settings</Text>
-        
-        <View style={styles.settingsCard}>
-          {settingsItems.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.settingItem,
-                index === settingsItems.length - 1 && styles.lastItem,
-              ]}>
-              <View style={styles.settingLeft}>
-                <View style={styles.iconContainer}>
-                  <item.icon size={20} color="#667eea" />
+    <View style={styles.container}>
+      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.header}>
+        <View style={styles.content}>
+          <Text style={styles.title}>Settings</Text>
+          
+          <View style={styles.settingsCard}>
+            {settingsItems.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.settingItem,
+                  index === settingsItems.length - 1 && styles.lastItem,
+                ]}
+                onPress={item.onPress}
+              >
+                <View style={styles.settingLeft}>
+                  <View style={styles.iconContainer}>
+                    <item.icon size={20} color="#667eea" />
+                  </View>
+                  <View style={styles.settingInfo}>
+                    <Text style={styles.settingTitle}>{item.title}</Text>
+                    <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
+                  </View>
                 </View>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>{item.title}</Text>
-                  <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
-                </View>
-              </View>
-              {item.rightComponent}
-            </TouchableOpacity>
-          ))}
-        </View>
+                {item.rightComponent}
+              </TouchableOpacity>
+            ))}
+          </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Version 1.0.0</Text>
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Version 1.0.0</Text>
+          </View>
         </View>
-      </View>
-    </LinearGradient>
+      </LinearGradient>
+
+      <NotificationSettings
+        visible={showNotificationSettings}
+        onClose={() => setShowNotificationSettings(false)}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  header: {
     flex: 1,
   },
   content: {

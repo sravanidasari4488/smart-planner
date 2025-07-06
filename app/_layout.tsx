@@ -12,6 +12,7 @@ import {
   Inter_700Bold
 } from '@expo-google-fonts/inter';
 import { SplashScreen } from 'expo-router';
+import { notificationService } from '@/lib/notificationService';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -38,6 +39,45 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  // Initialize notification service
+  useEffect(() => {
+    const initializeNotifications = async () => {
+      try {
+        // Request permissions on app start
+        await notificationService.requestPermissions();
+        
+        // Set up notification listeners
+        const responseSubscription = notificationService.addNotificationResponseListener(
+          (response) => {
+            console.log('Notification tapped:', response);
+            // Handle notification tap - could navigate to specific task
+            const taskData = response.notification.request.content.data;
+            if (taskData?.taskId) {
+              console.log('User tapped notification for task:', taskData.taskTitle);
+              // You could navigate to the task or show a modal here
+            }
+          }
+        );
+
+        const receivedSubscription = notificationService.addNotificationReceivedListener(
+          (notification) => {
+            console.log('Notification received while app is open:', notification);
+            // Handle notification received while app is in foreground
+          }
+        );
+
+        return () => {
+          responseSubscription.remove();
+          receivedSubscription.remove();
+        };
+      } catch (error) {
+        console.error('Error initializing notifications:', error);
+      }
+    };
+
+    initializeNotifications();
+  }, []);
 
   if (!fontsLoaded && !fontError) {
     return null;

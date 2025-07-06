@@ -8,6 +8,7 @@ export interface Task {
   priority: 'low' | 'medium' | 'high';
   category: string;
   createdAt: Date;
+  notificationId?: string; // Add notification ID to track scheduled notifications
 }
 
 export interface AIsuggestion {

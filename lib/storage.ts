@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Task, AIsuggestion } from '@/types/task';
+import { notificationService } from './notificationService';
 
 const TASKS_KEY = '@daily_planner_tasks';
 const COMPLETED_TASKS_KEY = '@daily_planner_completed_tasks';
@@ -59,6 +60,13 @@ export const TaskStorage = {
 
   async addTask(task: Task): Promise<void> {
     const tasks = await this.getTasks();
+    
+    // Schedule notification for the new task
+    const notificationId = await notificationService.scheduleTaskNotification(task);
+    if (notificationId) {
+      task.notificationId = notificationId;
+    }
+    
     tasks.push(task);
     await this.saveTasks(tasks);
   },
@@ -73,6 +81,11 @@ export const TaskStorage = {
       task.completed = true;
       task.completedAt = new Date();
       
+      // Cancel the notification for this task
+      if (task.notificationId) {
+        await notificationService.cancelNotification(task.notificationId);
+      }
+      
       // Move to completed tasks
       completedTasks.push(task);
       tasks.splice(taskIndex, 1);
@@ -84,6 +97,13 @@ export const TaskStorage = {
 
   async deleteTask(taskId: string): Promise<void> {
     const tasks = await this.getTasks();
+    const taskToDelete = tasks.find(task => task.id === taskId);
+    
+    // Cancel notification if it exists
+    if (taskToDelete?.notificationId) {
+      await notificationService.cancelNotification(taskToDelete.notificationId);
+    }
+    
     const filteredTasks = tasks.filter(task => task.id !== taskId);
     await this.saveTasks(filteredTasks);
   },
@@ -92,7 +112,24 @@ export const TaskStorage = {
     const tasks = await this.getTasks();
     const taskIndex = tasks.findIndex(task => task.id === taskId);
     if (taskIndex !== -1) {
-      tasks[taskIndex] = { ...tasks[taskIndex], ...updates };
+      const currentTask = tasks[taskIndex];
+      
+      // If time is being updated, reschedule notification
+      if (updates.time && updates.time !== currentTask.time) {
+        // Cancel old notification
+        if (currentTask.notificationId) {
+          await notificationService.cancelNotification(currentTask.notificationId);
+        }
+        
+        // Schedule new notification
+        const updatedTask = { ...currentTask, ...updates };
+        const notificationId = await notificationService.scheduleTaskNotification(updatedTask);
+        if (notificationId) {
+          updates.notificationId = notificationId;
+        }
+      }
+      
+      tasks[taskIndex] = { ...currentTask, ...updates };
       await this.saveTasks(tasks);
     }
   },
