@@ -8,7 +8,7 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import { Bell, BellOff, Clock, CheckCircle, Settings } from 'lucide-react-native';
+import { Bell, BellOff, Clock, CircleCheck as CheckCircle, Settings } from 'lucide-react-native';
 import { notificationService } from '@/lib/notificationService';
 
 interface NotificationSettingsProps {
