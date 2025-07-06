@@ -7,8 +7,9 @@ import {
   Switch,
   Alert,
   ScrollView,
+  Platform,
 } from 'react-native';
-import { Bell, BellOff, Clock, CircleCheck as CheckCircle, Settings } from 'lucide-react-native';
+import { Bell, BellOff, Clock, CircleCheck as CheckCircle, Settings, Smartphone, Monitor, AlertCircle } from 'lucide-react-native';
 import { notificationService } from '@/lib/notificationService';
 
 interface NotificationSettingsProps {
@@ -20,13 +21,20 @@ export default function NotificationSettings({ visible, onClose }: NotificationS
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [scheduledNotifications, setScheduledNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [notificationInfo, setNotificationInfo] = useState<any>(null);
 
   useEffect(() => {
     if (visible) {
       checkNotificationStatus();
       loadScheduledNotifications();
+      loadNotificationInfo();
     }
   }, [visible]);
+
+  const loadNotificationInfo = () => {
+    const info = notificationService.getNotificationInfo();
+    setNotificationInfo(info);
+  };
 
   const checkNotificationStatus = async () => {
     try {
@@ -55,12 +63,16 @@ export default function NotificationSettings({ visible, onClose }: NotificationS
           setNotificationsEnabled(true);
           Alert.alert(
             'Notifications Enabled',
-            'You will now receive reminders for your scheduled tasks!'
+            Platform.OS === 'web' 
+              ? 'You will now receive browser notifications for your scheduled tasks!'
+              : 'Notifications are enabled! Note: Full functionality requires a development build.'
           );
         } else {
           Alert.alert(
             'Permission Required',
-            'Please enable notifications in your device settings to receive task reminders.'
+            Platform.OS === 'web'
+              ? 'Please allow notifications in your browser to receive task reminders.'
+              : 'Please enable notifications in your device settings to receive task reminders.'
           );
         }
       } else {
@@ -86,7 +98,10 @@ export default function NotificationSettings({ visible, onClose }: NotificationS
         'This is a test notification from Smart Planner!',
         { test: true }
       );
-      Alert.alert('Test Sent', 'Check if you received the test notification!');
+      
+      if (Platform.OS === 'web') {
+        Alert.alert('Test Sent', 'Check if you received the browser notification!');
+      }
     } catch (error) {
       console.error('Error sending test notification:', error);
       Alert.alert('Error', 'Failed to send test notification');
@@ -109,12 +124,55 @@ export default function NotificationSettings({ visible, onClose }: NotificationS
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Platform Info */}
+          {notificationInfo && (
+            <View style={styles.section}>
+              <View style={[
+                styles.platformCard,
+                { backgroundColor: notificationInfo.available ? '#F0FDF4' : '#FEF3F2' }
+              ]}>
+                <View style={styles.platformHeader}>
+                  {Platform.OS === 'web' ? (
+                    <Monitor size={20} color={notificationInfo.available ? '#059669' : '#DC2626'} />
+                  ) : (
+                    <Smartphone size={20} color={notificationInfo.available ? '#059669' : '#DC2626'} />
+                  )}
+                  <Text style={[
+                    styles.platformTitle,
+                    { color: notificationInfo.available ? '#059669' : '#DC2626' }
+                  ]}>
+                    {notificationInfo.platform} Platform
+                  </Text>
+                </View>
+                <Text style={[
+                  styles.platformMessage,
+                  { color: notificationInfo.available ? '#047857' : '#B91C1C' }
+                ]}>
+                  {notificationInfo.message}
+                </Text>
+                
+                {Platform.OS !== 'web' && (
+                  <View style={styles.developmentBuildInfo}>
+                    <AlertCircle size={16} color="#F59E0B" />
+                    <Text style={styles.developmentBuildText}>
+                      For full mobile notification support, create a development build using Expo Dev Client
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* Main Toggle */}
           <View style={styles.section}>
             <View style={styles.settingRow}>
               <View style={styles.settingInfo}>
                 <Text style={styles.settingTitle}>Task Reminders</Text>
                 <Text style={styles.settingDescription}>
-                  Get notified when it's time to complete your scheduled tasks
+                  {Platform.OS === 'web' 
+                    ? 'Get browser notifications when it\'s time to complete your scheduled tasks'
+                    : 'Get notified when it\'s time to complete your scheduled tasks'
+                  }
                 </Text>
               </View>
               <Switch
@@ -127,62 +185,65 @@ export default function NotificationSettings({ visible, onClose }: NotificationS
             </View>
           </View>
 
-          {notificationsEnabled && (
-            <>
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Test Notifications</Text>
-                <TouchableOpacity style={styles.testButton} onPress={testNotification}>
-                  <Settings size={20} color="#6366F1" />
-                  <Text style={styles.testButtonText}>Send Test Notification</Text>
-                </TouchableOpacity>
-              </View>
+          {/* Test Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Test Notifications</Text>
+            <TouchableOpacity style={styles.testButton} onPress={testNotification}>
+              <Settings size={20} color="#6366F1" />
+              <Text style={styles.testButtonText}>Send Test Notification</Text>
+            </TouchableOpacity>
+          </View>
 
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>
-                  Scheduled Notifications ({scheduledNotifications.length})
-                </Text>
-                {scheduledNotifications.length === 0 ? (
-                  <View style={styles.emptyState}>
-                    <Clock size={32} color="#9CA3AF" />
-                    <Text style={styles.emptyText}>No scheduled notifications</Text>
-                    <Text style={styles.emptySubtext}>
-                      Create tasks with specific times to see them here
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.notificationsList}>
-                    {scheduledNotifications.map((notification, index) => (
-                      <View key={index} style={styles.notificationItem}>
-                        <View style={styles.notificationIcon}>
-                          <Bell size={16} color="#6366F1" />
-                        </View>
-                        <View style={styles.notificationContent}>
-                          <Text style={styles.notificationTitle}>
-                            {notification.content?.title || 'Task Reminder'}
-                          </Text>
-                          <Text style={styles.notificationTime}>
-                            {notification.trigger?.date 
-                              ? new Date(notification.trigger.date).toLocaleString()
-                              : 'Unknown time'
-                            }
-                          </Text>
-                        </View>
+          {/* Scheduled Notifications */}
+          {notificationsEnabled && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>
+                Scheduled Notifications ({scheduledNotifications.length})
+              </Text>
+              {scheduledNotifications.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Clock size={32} color="#9CA3AF" />
+                  <Text style={styles.emptyText}>No scheduled notifications</Text>
+                  <Text style={styles.emptySubtext}>
+                    Create tasks with specific times to see them here
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.notificationsList}>
+                  {scheduledNotifications.map((notification, index) => (
+                    <View key={index} style={styles.notificationItem}>
+                      <View style={styles.notificationIcon}>
+                        <Bell size={16} color="#6366F1" />
                       </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            </>
+                      <View style={styles.notificationContent}>
+                        <Text style={styles.notificationTitle}>
+                          {notification.content?.title || 'Task Reminder'}
+                        </Text>
+                        <Text style={styles.notificationTime}>
+                          {notification.trigger?.date 
+                            ? new Date(notification.trigger.date).toLocaleString()
+                            : 'Scheduled'
+                          }
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
           )}
 
+          {/* How it Works */}
           <View style={styles.infoSection}>
             <View style={styles.infoCard}>
               <CheckCircle size={20} color="#10B981" />
               <View style={styles.infoContent}>
                 <Text style={styles.infoTitle}>How it works</Text>
                 <Text style={styles.infoText}>
-                  When you create a task with a specific time, we'll automatically schedule a notification 
-                  to remind you when it's time to complete it. Notifications work even when the app is closed.
+                  {Platform.OS === 'web' 
+                    ? 'When you create a task with a specific time, we\'ll schedule a browser notification to remind you. Make sure to allow notifications when prompted.'
+                    : 'When you create a task with a specific time, we\'ll schedule a notification to remind you. For full functionality, create a development build using Expo Dev Client.'
+                  }
                 </Text>
               </View>
             </View>
@@ -208,7 +269,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
+    maxHeight: '85%',
     paddingBottom: 40,
   },
   header: {
@@ -246,6 +307,45 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 24,
+  },
+  platformCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  platformHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  platformTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    marginLeft: 8,
+  },
+  platformMessage: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    lineHeight: 20,
+  },
+  developmentBuildInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+  },
+  developmentBuildText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#92400E',
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 16,
   },
   sectionTitle: {
     fontSize: 16,

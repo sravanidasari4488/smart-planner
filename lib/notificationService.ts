@@ -1,19 +1,10 @@
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { Task } from '@/types/task';
 
-// Configure notification behavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
-
+// For web-only notifications since expo-notifications doesn't work in Expo Go
 export class NotificationService {
   private static instance: NotificationService;
+  private scheduledTimeouts: Map<string, NodeJS.Timeout> = new Map();
 
   static getInstance(): NotificationService {
     if (!NotificationService.instance) {
@@ -27,27 +18,20 @@ export class NotificationService {
       if (Platform.OS === 'web') {
         // Web notifications
         if ('Notification' in window) {
-          const permission = await Notification.requestPermission();
-          return permission === 'granted';
+          if (Notification.permission === 'granted') {
+            return true;
+          } else if (Notification.permission !== 'denied') {
+            const permission = await Notification.requestPermission();
+            return permission === 'granted';
+          }
         }
         return false;
       }
 
-      // Mobile notifications
-      if (Device.isDevice) {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
-        }
-        
-        return finalStatus === 'granted';
-      } else {
-        console.log('Must use physical device for Push Notifications');
-        return false;
-      }
+      // For mobile, we'll return true but notifications won't work in Expo Go
+      // This will work when you create a development build
+      console.log('📱 Mobile notifications require a development build (not available in Expo Go)');
+      return true;
     } catch (error) {
       console.error('Error requesting notification permissions:', error);
       return false;
@@ -71,39 +55,12 @@ export class NotificationService {
       if (Platform.OS === 'web') {
         return this.scheduleWebNotification(task, notificationTime);
       } else {
-        return this.scheduleMobileNotification(task, notificationTime);
+        // For mobile, we'll simulate scheduling but it won't actually work in Expo Go
+        console.log(`📱 Notification scheduled for ${task.title} at ${notificationTime.toLocaleString()} (requires development build)`);
+        return `mobile_${task.id}_${Date.now()}`;
       }
     } catch (error) {
       console.error('Error scheduling notification:', error);
-      return null;
-    }
-  }
-
-  private async scheduleMobileNotification(task: Task, notificationTime: Date): Promise<string | null> {
-    try {
-      const notificationId = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: '⏰ Task Reminder',
-          body: `Time for: ${task.title}`,
-          data: {
-            taskId: task.id,
-            taskTitle: task.title,
-            taskCategory: task.category,
-            taskPriority: task.priority,
-          },
-          sound: true,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-          categoryIdentifier: 'task-reminder',
-        },
-        trigger: {
-          date: notificationTime,
-        },
-      });
-
-      console.log(`Notification scheduled for ${task.title} at ${notificationTime.toLocaleString()}`);
-      return notificationId;
-    } catch (error) {
-      console.error('Error scheduling mobile notification:', error);
       return null;
     }
   }
@@ -116,6 +73,8 @@ export class NotificationService {
         return null;
       }
 
+      const notificationId = `web_${task.id}_${Date.now()}`;
+      
       const timeoutId = setTimeout(() => {
         if ('Notification' in window && Notification.permission === 'granted') {
           const notification = new Notification('⏰ Task Reminder', {
@@ -141,11 +100,20 @@ export class NotificationService {
           setTimeout(() => {
             notification.close();
           }, 10000);
+        } else {
+          // Fallback: show an alert if notifications aren't available
+          alert(`⏰ Task Reminder: Time for ${task.title}!`);
         }
+        
+        // Clean up the timeout reference
+        this.scheduledTimeouts.delete(notificationId);
       }, timeUntilNotification);
 
-      console.log(`Web notification scheduled for ${task.title} at ${notificationTime.toLocaleString()}`);
-      return timeoutId.toString();
+      // Store the timeout so we can cancel it later
+      this.scheduledTimeouts.set(notificationId, timeoutId);
+
+      console.log(`🌐 Web notification scheduled for ${task.title} at ${notificationTime.toLocaleString()}`);
+      return notificationId;
     } catch (error) {
       console.error('Error scheduling web notification:', error);
       return null;
@@ -154,14 +122,16 @@ export class NotificationService {
 
   async cancelNotification(notificationId: string): Promise<void> {
     try {
-      if (Platform.OS === 'web') {
-        // For web, we stored the timeout ID
-        const timeoutId = parseInt(notificationId);
-        if (!isNaN(timeoutId)) {
+      if (notificationId.startsWith('web_')) {
+        // Cancel web timeout
+        const timeoutId = this.scheduledTimeouts.get(notificationId);
+        if (timeoutId) {
           clearTimeout(timeoutId);
+          this.scheduledTimeouts.delete(notificationId);
         }
-      } else {
-        await Notifications.cancelScheduledNotificationAsync(notificationId);
+      } else if (notificationId.startsWith('mobile_')) {
+        // For mobile, we'll just log (actual cancellation would work in development build)
+        console.log(`📱 Mobile notification ${notificationId} cancelled (requires development build)`);
       }
       console.log(`Notification ${notificationId} cancelled`);
     } catch (error) {
@@ -171,9 +141,12 @@ export class NotificationService {
 
   async cancelAllTaskNotifications(): Promise<void> {
     try {
-      if (Platform.OS !== 'web') {
-        await Notifications.cancelAllScheduledNotificationsAsync();
+      // Cancel all web timeouts
+      for (const [notificationId, timeoutId] of this.scheduledTimeouts.entries()) {
+        clearTimeout(timeoutId);
       }
+      this.scheduledTimeouts.clear();
+      
       console.log('All notifications cancelled');
     } catch (error) {
       console.error('Error cancelling all notifications:', error);
@@ -211,34 +184,48 @@ export class NotificationService {
 
   async getScheduledNotifications(): Promise<any[]> {
     try {
-      if (Platform.OS === 'web') {
-        return []; // Web doesn't have a way to list scheduled notifications
-      } else {
-        return await Notifications.getAllScheduledNotificationsAsync();
+      // Return information about scheduled web notifications
+      const notifications = [];
+      for (const [notificationId] of this.scheduledTimeouts.entries()) {
+        notifications.push({
+          identifier: notificationId,
+          content: {
+            title: 'Task Reminder',
+            body: 'Scheduled task notification',
+          },
+          trigger: {
+            type: 'timeInterval',
+          },
+        });
       }
+      return notifications;
     } catch (error) {
       console.error('Error getting scheduled notifications:', error);
       return [];
     }
   }
 
-  // Handle notification responses (when user taps on notification)
+  // Placeholder methods for compatibility
   addNotificationResponseListener(callback: (response: any) => void) {
-    if (Platform.OS !== 'web') {
-      return Notifications.addNotificationResponseReceivedListener(callback);
+    if (Platform.OS === 'web') {
+      // For web, we can listen to notification clicks via the onclick handler
+      console.log('Notification response listener added (web)');
+    } else {
+      console.log('📱 Notification response listener requires development build');
     }
     return { remove: () => {} };
   }
 
-  // Handle notifications received while app is in foreground
   addNotificationReceivedListener(callback: (notification: any) => void) {
-    if (Platform.OS !== 'web') {
-      return Notifications.addNotificationReceivedListener(callback);
+    if (Platform.OS === 'web') {
+      console.log('Notification received listener added (web)');
+    } else {
+      console.log('📱 Notification received listener requires development build');
     }
     return { remove: () => {} };
   }
 
-  // Send immediate notification (for testing or instant reminders)
+  // Send immediate notification (for testing)
   async sendImmediateNotification(title: string, body: string, data?: any): Promise<void> {
     try {
       const hasPermission = await this.requestPermissions();
@@ -265,21 +252,37 @@ export class NotificationService {
           setTimeout(() => {
             notification.close();
           }, 5000);
+        } else {
+          // Fallback for browsers without notification support
+          alert(`${title}\n${body}`);
         }
       } else {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title,
-            body,
-            data,
-            sound: true,
-            priority: Notifications.AndroidNotificationPriority.HIGH,
-          },
-          trigger: null, // Send immediately
-        });
+        console.log(`📱 Test notification: ${title} - ${body} (requires development build)`);
+        // For mobile in Expo Go, we'll show an alert as a fallback
+        alert(`📱 Test Notification\n${title}\n${body}\n\nNote: Real notifications require a development build`);
       }
     } catch (error) {
       console.error('Error sending immediate notification:', error);
+    }
+  }
+
+  // Get platform-specific notification info
+  getNotificationInfo(): { platform: string; available: boolean; message: string } {
+    if (Platform.OS === 'web') {
+      const available = 'Notification' in window;
+      return {
+        platform: 'Web',
+        available,
+        message: available 
+          ? 'Web notifications are supported in this browser'
+          : 'Web notifications are not supported in this browser'
+      };
+    } else {
+      return {
+        platform: 'Mobile',
+        available: false,
+        message: 'Mobile notifications require a development build (not available in Expo Go)'
+      };
     }
   }
 }

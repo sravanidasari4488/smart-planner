@@ -13,6 +13,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { SplashScreen } from 'expo-router';
 import { notificationService } from '@/lib/notificationService';
+import { Platform } from 'react-native';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -47,12 +48,12 @@ export default function RootLayout() {
         // Request permissions on app start
         await notificationService.requestPermissions();
         
-        // Set up notification listeners
+        // Set up notification listeners (these work differently on web vs mobile)
         const responseSubscription = notificationService.addNotificationResponseListener(
           (response) => {
             console.log('Notification tapped:', response);
             // Handle notification tap - could navigate to specific task
-            const taskData = response.notification.request.content.data;
+            const taskData = response.notification?.request?.content?.data;
             if (taskData?.taskId) {
               console.log('User tapped notification for task:', taskData.taskTitle);
               // You could navigate to the task or show a modal here
